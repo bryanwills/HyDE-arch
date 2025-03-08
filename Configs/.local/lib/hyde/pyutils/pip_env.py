@@ -8,9 +8,9 @@ import importlib
 lib_dir = os.path.dirname(os.path.abspath(__file__))
 sys.path.insert(0, lib_dir)
 
+
 import xdg_base_dirs  # noqa: E402
 import wrapper.libnotify as notify  # noqa: E402
-import logger  # noqa: E402
 
 
 if lib_dir is None:
@@ -37,22 +37,30 @@ def create_venv(venv_path, requirements_file=None):
     """Create a virtual environment and optionally install dependencies."""
     if not os.path.exists(os.path.join(venv_path, "bin", "pip")):
         subprocess.run([sys.executable, "-m", "venv", venv_path], check=True)
-        # logger.debug(f"Virtual environment created at {venv_path}")
         pip_executable = os.path.join(venv_path, "bin", "pip")
         subprocess.run([pip_executable, "install", "--upgrade", "pip"], check=True)
-        # logger.debug("pip upgraded to the latest version")
         if requirements_file and os.path.exists(requirements_file):
+            with open(requirements_file, "r") as f:
+                list_requirements = "\n".join(
+                    [
+                        f"📦 {line.strip()}"
+                        for line in f
+                        if line.strip() and not line.startswith("#")
+                    ]
+                )
+
+            notify.send(
+                "HyDE PIP",
+                f"⏳ Installing virtual environment Dependencies:\n {list_requirements}",
+            )
             result = subprocess.run(
                 [pip_executable, "install", "-r", requirements_file],
                 capture_output=True,
                 text=True,
             )
-            logger.debug(f"Command output: {result.stdout}")
-            logger.debug(f"Command error: {result.stderr}")
             result.check_returncode()
-            # logger.debug(f"Dependencies installed from {requirements_file}")
+        notify.send("HyDE PIP", "✅ Virtual environment created successfully")
     else:
-        logger.debug(f"Virtual environment already exists at {venv_path}")
         pass
 
 
@@ -60,9 +68,7 @@ def destroy_venv(venv_path):
     """Destroy the virtual environment while retaining the requirements.txt file."""
     if os.path.exists(venv_path):
         shutil.rmtree(venv_path)
-        # logger.debug(f"Virtual environment destroyed at {venv_path}")
     # else:
-    # logger.debug(f"No virtual environment found at {venv_path}")
 
 
 def install_dependencies(venv_path, requirements_file):
@@ -72,12 +78,8 @@ def install_dependencies(venv_path, requirements_file):
     else:
         pip_executable = os.path.join(venv_path, "bin", "pip")
         command = [pip_executable, "install", "-r", requirements_file]
-        # logger.debug(f"Running command: {' '.join(command)}")
         result = subprocess.run(command, capture_output=True, text=True)
-        # logger.debug(f"Command output: {result.stdout}")
-        # logger.debug(f"Command error: {result.stderr}")
         result.check_returncode()
-        # logger.debug(f"Dependencies installed from {requirements_file}")
 
 
 def install_package(venv_path, package):
@@ -90,10 +92,7 @@ def install_package(venv_path, package):
         capture_output=True,
         text=True,
     )
-    # logger.debug(f"Command output: {result.stdout}")
-    # logger.debug(f"Command error: {result.stderr}")
     result.check_returncode()
-    # logger.debug(f"Package {package} installed")
 
 
 def uninstall_package(venv_path, package):
@@ -104,10 +103,7 @@ def uninstall_package(venv_path, package):
         capture_output=True,
         text=True,
     )
-    # logger.debug(f"Command output: {result.stdout}")
-    # logger.debug(f"Command error: {result.stderr}")
     result.check_returncode()
-    # logger.debug(f"Package {package} uninstalled")
 
 
 def v_import(module_name):
@@ -118,7 +114,7 @@ def v_import(module_name):
         module = importlib.import_module(module_name)
         return module
     except ImportError:
-        notify.send("HyDE Waybar", f"Installing {module_name} module...")
+        notify.send("HyDE PIP", f"Installing {module_name} module...")
         install_package(venv_path, module_name)
 
         # Reload sys.path to include the new module
@@ -136,7 +132,7 @@ def v_import(module_name):
 
         try:
             module = importlib.import_module(module_name)
-            notify.send("HyDE Waybar", f"Successfully installed {module_name}.")
+            notify.send("HyDE PIP", f"Successfully installed {module_name}.")
             return module
         except ImportError as e:
             notify.send(
@@ -164,9 +160,9 @@ def v_install(module_name, force_reinstall=False):
         text=True,
     )
     if result.returncode != 0 or force_reinstall:
-        notify.send("HyDE Waybar", f"Installing {module_name} module...")
+        notify.send("HyDE PIP", f"Installing {module_name} module...")
         install_package(venv_path, module_name)
-        notify.send("HyDE Waybar", f"Successfully installed {module_name}.")
+        notify.send("HyDE PIP", f"Successfully installed {module_name}.")
     sys.path.insert(0, venv_path)
     sys.path.insert(
         0,
